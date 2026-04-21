@@ -1,0 +1,890 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>Brauerei Führungen</title>
+  <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+  <script>emailjs.init("-GHrk5njDl330U0se");</script>
+  <link href="https://fonts.googleapis.com/css2?family=Lora:wght@600;700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:'DM Sans',sans-serif;background:#F7F5F0;color:#1C1917}
+    input,button,select{font-family:inherit}
+    input:focus,select:focus{outline:none;border-color:#D97706!important}
+    .card{background:#fff;border:1px solid #E8E4DC;border-radius:12px;padding:16px 18px;margin-bottom:10px;cursor:pointer}
+    .card:hover{box-shadow:0 4px 16px rgba(0,0,0,0.08)}
+    .overlay-bg{position:fixed;inset:0;background:rgba(28,25,23,0.45);display:flex;align-items:center;justify-content:center;z-index:999;padding:16px;backdrop-filter:blur(4px)}
+    .overlay-box{background:#fff;border-radius:20px;padding:28px;width:100%;max-width:480px;box-shadow:0 24px 64px rgba(0,0,0,0.15);border:1px solid #E8E4DC;max-height:90vh;overflow-y:auto}
+    .tab-bar{display:flex;overflow-x:auto;-webkit-overflow-scrolling:touch}
+    .tab-btn{flex-shrink:0;padding:9px 10px;border:none;background:transparent;font-size:12px;cursor:pointer;display:flex;align-items:center;gap:5px;font-family:inherit;border-bottom:2.5px solid transparent;color:#78716C;font-weight:500}
+    .tab-btn.active{border-bottom-color:#D97706;color:#D97706;font-weight:700}
+    .badge{background:#D97706;color:#fff;border-radius:99px;padding:1px 6px;font-size:10px;font-weight:800}
+    .inp{width:100%;padding:10px 12px;border-radius:8px;background:#FAFAF9;border:1.5px solid #E8E4DC;color:#1C1917;font-size:14px;font-family:inherit;outline:none}
+    .btn-amber{padding:11px 0;border-radius:10px;border:none;background:#D97706;color:#fff;font-weight:700;font-size:14px;cursor:pointer;font-family:inherit;width:100%}
+    .btn-green{padding:11px 0;border-radius:10px;border:none;background:#059669;color:#fff;font-weight:700;font-size:14px;cursor:pointer;font-family:inherit}
+    .btn-blue{padding:11px 0;border-radius:10px;border:none;background:#2563EB;color:#fff;font-weight:700;font-size:14px;cursor:pointer;font-family:inherit}
+    .btn-outline{padding:11px 0;border-radius:10px;border:1.5px solid #E8E4DC;background:#fff;color:#DC2626;font-weight:700;font-size:14px;cursor:pointer;font-family:inherit}
+    .lbl{display:block;font-size:11px;font-weight:700;color:#78716C;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:5px}
+    .field{margin-bottom:14px}
+    .chip{padding:3px 10px;border-radius:99px;font-size:11px;font-weight:700;border:1px solid}
+    .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    .section{background:#fff;border:1px solid #E8E4DC;border-radius:16px;padding:20px;margin-bottom:16px}
+    .irow{display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid #E8E4DC}
+  </style>
+</head>
+<body>
+<div id="app"></div>
+
+<script>
+const SB_URL = "https://wqobiorukdvaofcvaych.supabase.co";
+const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Indxb2Jpb3J1a2R2YW9mY3ZheWNoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY0MTI3NDgsImV4cCI6MjA5MTk4ODc0OH0.y4kSK-VxSD3T1k8TTo3XMPNbC9TFXU7WPTx9UoDheO4";
+
+const MONTHS = ["Januar","Februar","März","April","Mai","Juni","Juli","August","September","Oktober","November","Dezember"];
+const MONTHS_S = ["Jan","Feb","Mär","Apr","Mai","Jun","Jul","Aug","Sep","Okt","Nov","Dez"];
+const WDAYS = ["Mo","Di","Mi","Do","Fr","Sa","So"];
+
+async function supabase(table, method, body, filter) {
+  filter = filter || "";
+  method = method || "GET";
+  const opts = {
+    method: method,
+    headers: {
+      "apikey": SB_KEY,
+      "Authorization": "Bearer " + SB_KEY,
+      "Content-Type": "application/json",
+      "Accept": "application/json",
+      "Prefer": "return=representation"
+    }
+  };
+  if (body) opts.body = JSON.stringify(body);
+  try {
+    const r = await fetch(SB_URL + "/rest/v1/" + table + filter, opts);
+    const t = await r.text();
+    return t ? JSON.parse(t) : [];
+  } catch(e) { console.error(e); return null; }
+}
+
+function fmtD(d) {
+  if (!d) return "–";
+  return new Date(d).toLocaleDateString("de-DE", {day:"2-digit",month:"long",year:"numeric"});
+}
+
+
+// ── EMAIL ──────────────────────────────────────────────────────────────────
+const EJS_SERVICE = "service_b36hyf3";
+const EJS_TEMPLATE_NEU = "template_zgxtg1t";
+const EJS_TEMPLATE_STORNO = "template_zk1cf7f";
+
+// Admin E-Mails aus Datenbank laden
+let ADMIN_EMAILS = [];
+async function ladeAdminEmails() {
+  const data = await supabase("einstellungen","GET",null,"?id=eq.1");
+  if (data && data[0]) {
+    ADMIN_EMAILS = [];
+    if (data[0].admin_email) ADMIN_EMAILS.push(data[0].admin_email);
+    if (data[0].admin_email2) ADMIN_EMAILS.push(data[0].admin_email2);
+  }
+}
+
+async function sendeEmail(guide_name, guide_email, template, daten) {
+  try {
+    await emailjs.send(EJS_SERVICE, template, {
+      guide_name: guide_name,
+      guide_email: guide_email,
+      gast_name: daten.gast_name || "",
+      datum: daten.datum || "",
+      uhrzeit: daten.uhrzeit || "",
+      pax: daten.pax || "",
+      sprache: daten.sprache === "E" ? "Englisch" : "Deutsch",
+      anzahl_guides: daten.anzahl_guides || 1,
+    });
+    console.log("E-Mail gesendet an " + guide_email);
+  } catch(e) {
+    console.error("E-Mail Fehler:", e);
+  }
+}
+
+async function emailAnAdmin(template, daten) {
+  for (const email of ADMIN_EMAILS) {
+    await sendeEmail("Admin", email, template, daten);
+  }
+}
+
+async function emailAnAlleGuides(daten) {
+  const guides = STATE.guides;
+  for (const g of guides) {
+    if (g.email) {
+      await sendeEmail(g.name, g.email, EJS_TEMPLATE_NEU, daten);
+    }
+  }
+  await emailAnAdmin(EJS_TEMPLATE_NEU, daten);
+}
+
+async function emailStorno(daten) {
+  const guides = STATE.guides;
+  for (const g of guides) {
+    if (g.email) {
+      await sendeEmail(g.name, g.email, EJS_TEMPLATE_STORNO, daten);
+    }
+  }
+  await emailAnAdmin(EJS_TEMPLATE_STORNO, daten);
+}
+
+async function emailBestaetigung(daten) {
+  const guides = STATE.guides;
+  for (const g of guides) {
+    if (g.email) {
+      await sendeEmail(g.name, g.email, EJS_TEMPLATE_NEU, daten);
+    }
+  }
+  await emailAnAdmin(EJS_TEMPLATE_NEU, daten);
+}
+
+// ── STATE ──────────────────────────────────────────────────────────────────
+let STATE = {
+  rolle: "admin",
+  seite: 1,
+  neuAnfrage: false,
+  anfragen: [], bestaetigt: [], kalender: [], stornos: [], guides: [],
+  laden: false,
+  modal: null,
+  kalMonat: new Date(),
+  adminMsg: "",
+};
+
+function setState(patch) {
+  Object.assign(STATE, patch);
+  render();
+}
+
+// ── SUPABASE ───────────────────────────────────────────────────────────────
+async function loadAll() {
+  setState({laden: true});
+  const [a, k, s, g] = await Promise.all([
+    supabase("anfragen","GET",null,"?order=erstellt_am.desc"),
+    supabase("kalender","GET",null,"?order=datum.asc"),
+    supabase("stornos","GET",null,"?order=storniert_am.desc"),
+    supabase("guides","GET",null,"?order=name.asc"),
+  ]);
+  const alle = a || [];
+  setState({
+    anfragen: alle.filter(x => x.status === "offen"),
+    bestaetigt: alle.filter(x => x.status === "bestaetigt"),
+    kalender: k || [],
+    stornos: s || [],
+    guides: g || [],
+    laden: false
+  });
+}
+
+// ── RENDER ─────────────────────────────────────────────────────────────────
+function render() {
+  const app = document.getElementById("app");
+  app.innerHTML = renderApp();
+  bindApp();
+}
+
+// ── APP SHELL ──────────────────────────────────────────────────────────────
+function renderApp() {
+  const tabs = [
+    {label:"Dashboard",icon:"🏠",id:1},
+    {label:"BF neu",icon:"📬",badge:STATE.anfragen.length,id:2},
+    {label:"Bestätigung",icon:"✅",badge:STATE.bestaetigt.length,id:3},
+    {label:"Kalender",icon:"📅",id:4},
+    {label:"Stornos",icon:"❌",id:5},
+  ];
+  if (STATE.rolle === "admin") tabs.push({label:"Admin",icon:"⚙️",id:6});
+
+  const tabHtml = tabs.map(t => `
+    <button class="tab-btn ${STATE.seite===t.id?"active":""}" data-tab="${t.id}">
+      <span>${t.icon}</span><span>${t.label}</span>
+      ${t.badge>0 ? `<span class="badge">${t.badge}</span>` : ""}
+    </button>`).join("");
+
+  let content = "";
+  if (STATE.seite===1) content = renderDashboard();
+  else if (STATE.seite===2) content = renderBFNeu();
+  else if (STATE.seite===3) content = renderBestaetigung();
+  else if (STATE.seite===4) content = renderKalender();
+  else if (STATE.seite===5) content = renderStornos();
+  else if (STATE.seite===6 && STATE.rolle==="admin") content = renderAdmin();
+
+  const modalHtml = STATE.modal ? renderModal() : "";
+
+  return `
+  <div style="min-height:100vh;background:#F7F5F0">
+    <div style="background:#fff;border-bottom:1px solid #E8E4DC;padding:0 16px;position:sticky;top:0;z-index:100;box-shadow:0 1px 8px rgba(0,0,0,0.06)">
+      <div style="max-width:820px;margin:0 auto">
+        <div style="padding:12px 0;display:flex;align-items:center;justify-content:space-between">
+          <div style="display:flex;align-items:center;gap:10px">
+            <div style="width:34px;height:34px;border-radius:10px;background:#FEF3C7;border:1.5px solid #FDE68A;display:flex;align-items:center;justify-content:center;font-size:18px">🍺</div>
+            <div>
+              <div style="font-family:'Lora',serif;font-size:15px;font-weight:700;color:#1C1917;line-height:1">Brauerei Führungen</div>
+              <div style="font-size:10px;color:#78716C;margin-top:1px">${STATE.rolle==="admin"?"👑 Admin":"👤 Tourguide"}</div>
+            </div>
+          </div>
+          <div style="display:flex;gap:8px">
+            <button id="btnNeuAnfrage" style="background:#D97706;border:none;color:#fff;font-weight:700;font-size:12px;padding:7px 12px;border-radius:8px;cursor:pointer;font-family:inherit">+ Neue Anfrage</button>
+            <button id="btnAbmelden" style="background:none;border:1px solid #E8E4DC;color:#78716C;font-size:11px;padding:5px 10px;border-radius:7px;cursor:pointer;font-family:inherit">Abmelden</button>
+          </div>
+        </div>
+        <div class="tab-bar">${tabHtml}</div>
+      </div>
+    </div>
+    <div style="max-width:820px;margin:0 auto;padding:24px 16px 60px">${content}</div>
+    ${modalHtml}
+    ${STATE.neuAnfrage ? renderNeueAnfrageForm() : ""}
+  </div>`;
+}
+
+function bindApp() {
+  document.querySelectorAll(".tab-btn").forEach(b => {
+    b.addEventListener("click", () => setState({seite: parseInt(b.dataset.tab)}));
+  });
+  const na = document.getElementById("btnNeuAnfrage");
+  if (na) na.addEventListener("click", () => setState({neuAnfrage: true}));
+  const ab = document.getElementById("btnAbmelden");
+  if (ab) ab.addEventListener("click", () => location.reload());
+  bindPageContent();
+  bindModal();
+  bindNeueAnfrageForm();
+}
+
+// ── DASHBOARD ──────────────────────────────────────────────────────────────
+function renderDashboard() {
+  const heute = new Date();
+  const naechste = [...STATE.kalender].filter(k=>new Date(k.datum)>=heute).sort((a,b)=>new Date(a.datum)-new Date(b.datum)).slice(0,4);
+  const stats = [
+    {label:"Offene Anfragen",value:STATE.anfragen.length,icon:"📬",color:"#D97706",bg:"#FEF3C7",border:"#FDE68A",seite:2},
+    {label:"Zur Bestätigung",value:STATE.bestaetigt.length,icon:"✅",color:"#059669",bg:"#D1FAE5",border:"#6EE7B7",seite:3},
+    {label:"Im Kalender",value:STATE.kalender.length,icon:"📅",color:"#2563EB",bg:"#DBEAFE",border:"#93C5FD",seite:4},
+    {label:"Stornos",value:STATE.stornos.length,icon:"❌",color:"#DC2626",bg:"#FEE2E2",border:"#FCA5A5",seite:5},
+  ];
+  return `
+  <div style="margin-bottom:24px">
+    <h2 style="font-family:'Lora',serif;font-size:26px;color:#1C1917;margin-bottom:4px">Guten Tag! 👋</h2>
+    <p style="color:#78716C;font-size:14px">${heute.toLocaleDateString("de-DE",{weekday:"long",day:"numeric",month:"long",year:"numeric"})}</p>
+  </div>
+  <div class="grid2" style="margin-bottom:24px">
+    ${stats.map(s=>`
+    <div class="dash-stat" data-seite="${s.seite}" style="background:${s.bg};border:1.5px solid ${s.border};border-radius:16px;padding:16px 14px;cursor:pointer;text-align:center">
+      <div style="font-size:24px;margin-bottom:4px">${s.icon}</div>
+      <div style="font-size:26px;font-weight:800;color:${s.color};line-height:1;margin-bottom:4px">${s.value}</div>
+      <div style="font-size:12px;color:${s.color};font-weight:600">${s.label}</div>
+    </div>`).join("")}
+  </div>
+  ${STATE.anfragen.length>0?`
+  <div style="background:#FEF3C7;border:1.5px solid #FDE68A;border-radius:14px;padding:14px 18px;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between">
+    <div>
+      <div style="font-weight:700;color:#D97706">⚠️ ${STATE.anfragen.length} offene Anfrage${STATE.anfragen.length!==1?"n":""}</div>
+      <div style="font-size:13px;color:#D97706;opacity:0.8">Warten auf Guide-Zuweisung</div>
+    </div>
+    <button class="dash-stat" data-seite="2" style="background:#D97706;border:none;color:#fff;font-weight:700;font-size:13px;padding:8px 14px;border-radius:8px;cursor:pointer;font-family:inherit">Bearbeiten →</button>
+  </div>`:""}
+  <div style="background:#fff;border:1px solid #E8E4DC;border-radius:16px;overflow:hidden">
+    <div style="padding:14px 18px;border-bottom:1px solid #E8E4DC;display:flex;justify-content:space-between;align-items:center">
+      <h3 style="margin:0;font-size:15px;font-weight:700;color:#1C1917">Nächste Führungen</h3>
+      <button class="dash-stat" data-seite="4" style="background:none;border:none;color:#D97706;font-weight:600;font-size:13px;cursor:pointer;font-family:inherit">Alle →</button>
+    </div>
+    ${naechste.length===0?`<div style="padding:28px 18px;text-align:center;color:#78716C">Keine bevorstehenden Führungen</div>`:""}
+    ${naechste.map((k,i)=>`
+    <div style="padding:13px 18px;border-bottom:${i<naechste.length-1?"1px solid #E8E4DC":"none"};display:flex;align-items:center;gap:12px">
+      <div style="background:#FEF3C7;border:1px solid #FDE68A;border-radius:10px;padding:7px 9px;text-align:center;min-width:46px">
+        <div style="font-size:10px;color:#D97706;font-weight:700">${MONTHS_S[new Date(k.datum).getMonth()]}</div>
+        <div style="font-size:18px;font-weight:800;color:#D97706;line-height:1">${new Date(k.datum).getDate()}</div>
+      </div>
+      <div style="flex:1">
+        <div style="font-weight:700;font-size:14px;color:#1C1917">${k.gast_name}</div>
+        <div style="font-size:12px;color:#78716C">${k.uhrzeit} Uhr · ${k.pax} Pax · ${k.sprache==="E"?"🇬🇧":"🇩🇪"}</div>
+      </div>
+      <span class="chip" style="color:#059669;background:#D1FAE5;border-color:#6EE7B7">Bestätigt</span>
+    </div>`).join("")}
+  </div>`;
+}
+
+// ── BF NEU ─────────────────────────────────────────────────────────────────
+function renderBFNeu() {
+  if (STATE.laden) return `<div style="text-align:center;padding:60px 0;color:#78716C">⏳ Laden...</div>`;
+  return `
+  <div style="margin-bottom:24px">
+    <h2 style="font-family:'Lora',serif;font-size:24px;color:#1C1917;margin-bottom:4px">Offene Anfragen</h2>
+    <p style="color:#78716C;font-size:14px">${STATE.anfragen.length} Anfrage${STATE.anfragen.length!==1?"n":""} – Guides werden gesucht</p>
+  </div>
+  ${STATE.anfragen.length===0?`<div style="background:#fff;border:1px solid #E8E4DC;border-radius:16px;padding:48px 20px;text-align:center"><div style="font-size:40px;margin-bottom:12px">🎉</div><div style="font-weight:700;color:#1C1917">Keine offenen Anfragen!</div></div>`:""}
+  ${STATE.anfragen.map(a=>{
+    const z=(a.guide_ids||[]).length;
+    return `
+    <div class="card anfrage-card" data-id="${a.id}" style="border-left:4px solid #D97706">
+      <div style="display:flex;justify-content:space-between;margin-bottom:8px">
+        <div>
+          <div style="font-weight:700;font-size:16px;color:#1C1917;margin-bottom:2px">${a.gast_name}</div>
+          <div style="font-size:12px;color:#78716C">Erstellt: ${new Date(a.erstellt_am).toLocaleDateString("de-DE")}</div>
+        </div>
+        <div style="text-align:right">
+          <span class="chip" style="color:#D97706;background:#FEF3C7;border-color:#FDE68A">Offen</span>
+          <div style="font-size:12px;color:${z>=a.anzahl_guides?"#059669":"#D97706"};font-weight:700;margin-top:4px">👤 ${z}/${a.anzahl_guides} Guides</div>
+        </div>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:12px;font-size:13px;color:#1C1917">
+        <span>📅 ${fmtD(a.datum)}</span><span>🕐 ${a.uhrzeit} Uhr</span><span>👥 ${a.pax} Pax</span><span>${a.sprache==="E"?"🇬🇧":"🇩🇪"}</span>
+      </div>
+    </div>`;
+  }).join("")}`;
+}
+
+// ── BESTÄTIGUNG ────────────────────────────────────────────────────────────
+function renderBestaetigung() {
+  if (STATE.laden) return `<div style="text-align:center;padding:60px 0;color:#78716C">⏳ Laden...</div>`;
+  return `
+  <div style="margin-bottom:24px">
+    <h2 style="font-family:'Lora',serif;font-size:24px;color:#1C1917;margin-bottom:4px">Warten auf Bestätigung Gast</h2>
+    <p style="color:#78716C;font-size:14px">${STATE.bestaetigt.length} Führung${STATE.bestaetigt.length!==1?"en":""} – alle Guides zugesagt</p>
+  </div>
+  ${STATE.bestaetigt.length===0?`<div style="background:#fff;border:1px solid #E8E4DC;border-radius:16px;padding:48px 20px;text-align:center"><div style="font-size:40px;margin-bottom:12px">✅</div><div style="font-weight:700;color:#1C1917">Keine ausstehenden Bestätigungen</div></div>`:""}
+  ${STATE.bestaetigt.map(b=>`
+  <div class="card best-card" data-id="${b.id}" style="border-left:4px solid #059669">
+    <div style="display:flex;justify-content:space-between;margin-bottom:8px">
+      <div>
+        <div style="font-weight:700;font-size:16px;color:#1C1917;margin-bottom:2px">${b.gast_name}</div>
+        <div style="font-size:12px;color:#059669;font-weight:600">✓ ${b.anzahl_guides} Guide${b.anzahl_guides>1?"s":""} zugesagt</div>
+      </div>
+      <span class="chip" style="color:#059669;background:#D1FAE5;border-color:#6EE7B7">Guides bereit</span>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:12px;font-size:13px;color:#1C1917">
+      <span>📅 ${fmtD(b.datum)}</span><span>🕐 ${b.uhrzeit} Uhr</span><span>👥 ${b.pax} Pax</span><span>${b.sprache==="E"?"🇬🇧":"🇩🇪"}</span>
+    </div>
+  </div>`).join("")}`;
+}
+
+// ── KALENDER ───────────────────────────────────────────────────────────────
+function renderKalender() {
+  if (STATE.laden) return `<div style="text-align:center;padding:60px 0;color:#78716C">⏳ Laden...</div>`;
+  const j=STATE.kalMonat.getFullYear(), m=STATE.kalMonat.getMonth();
+  const tage=new Date(j,m+1,0).getDate();
+  const erster=(()=>{const d=new Date(j,m,1).getDay();return d===0?6:d-1;})();
+  const nT={};
+  STATE.kalender.forEach(k=>{const d=new Date(k.datum);if(d.getFullYear()===j&&d.getMonth()===m){const t=d.getDate();if(!nT[t])nT[t]=[];nT[t].push(k);}});
+  const dm=STATE.kalender.filter(k=>{const d=new Date(k.datum);return d.getFullYear()===j&&d.getMonth()===m;}).sort((a,b)=>new Date(a.datum)-new Date(b.datum));
+
+  const calCells = [];
+  for(let i=0;i<erster;i++) calCells.push(`<div style="min-height:70px;border-top:1px solid #E8E4DC"></div>`);
+  for(let i=0;i<tage;i++){
+    const tag=i+1, evs=nT[tag]||[];
+    const heu=new Date().getDate()===tag&&new Date().getMonth()===m&&new Date().getFullYear()===j;
+    calCells.push(`
+    <div style="min-height:70px;border-top:1px solid #E8E4DC;${(i+erster)%7!==0?"border-left:1px solid #E8E4DC":"none"};padding:4px 3px">
+      <span style="display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:50%;background:${heu?"#D97706":"transparent"};color:${heu?"#fff":"#78716C"};font-size:12px;font-weight:${heu?700:400}">${tag}</span>
+      ${evs.map(ev=>`<div class="kal-ev" data-id="${ev.id}" style="background:#DBEAFE;border:1px solid #93C5FD;border-radius:4px;padding:2px 4px;font-size:9px;color:#2563EB;font-weight:700;cursor:pointer;margin-bottom:2px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">${ev.uhrzeit} ${ev.gast_name}</div>`).join("")}
+    </div>`);
+  }
+
+  return `
+  <div style="margin-bottom:24px">
+    <h2 style="font-family:'Lora',serif;font-size:24px;color:#1C1917;margin-bottom:4px">Kalender</h2>
+    <p style="color:#78716C;font-size:14px">${STATE.kalender.length} bestätigte Führung${STATE.kalender.length!==1?"en":""}</p>
+  </div>
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;background:#fff;border:1px solid #E8E4DC;border-radius:12px;padding:10px 16px">
+    <button id="kalPrev" style="background:none;border:1px solid #E8E4DC;color:#1C1917;padding:5px 12px;border-radius:7px;cursor:pointer;font-size:16px;font-weight:700;font-family:inherit">‹</button>
+    <span style="color:#1C1917;font-weight:700;font-size:16px">${MONTHS[m]} ${j}</span>
+    <button id="kalNext" style="background:none;border:1px solid #E8E4DC;color:#1C1917;padding:5px 12px;border-radius:7px;cursor:pointer;font-size:16px;font-weight:700;font-family:inherit">›</button>
+  </div>
+  <div style="background:#fff;border:1px solid #E8E4DC;border-radius:14px;overflow:hidden;margin-bottom:20px">
+    <div style="display:grid;grid-template-columns:repeat(7,1fr);background:#F7F5F0;border-bottom:1px solid #E8E4DC">
+      ${WDAYS.map(d=>`<div style="text-align:center;padding:8px 2px;font-size:11px;color:#78716C;font-weight:700;text-transform:uppercase">${d}</div>`).join("")}
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(7,1fr)">${calCells.join("")}</div>
+  </div>
+  <div style="background:#fff;border:1px solid #E8E4DC;border-radius:14px;overflow:hidden">
+    <div style="padding:14px 18px;border-bottom:1px solid #E8E4DC"><span style="font-weight:700;color:#1C1917">${MONTHS[m]} ${j} – Führungen</span></div>
+    ${dm.length===0?`<div style="padding:28px 18px;text-align:center;color:#78716C">Keine Führungen in diesem Monat</div>`:""}
+    ${dm.map((k,i)=>`
+    <div class="kal-ev" data-id="${k.id}" style="padding:13px 18px;border-bottom:${i<dm.length-1?"1px solid #E8E4DC":"none"};display:flex;align-items:center;gap:12px;cursor:pointer">
+      <div style="background:#DBEAFE;border:1px solid #93C5FD;border-radius:10px;padding:7px 9px;text-align:center;min-width:46px">
+        <div style="font-size:10px;color:#2563EB;font-weight:700">${MONTHS_S[new Date(k.datum).getMonth()]}</div>
+        <div style="font-size:18px;font-weight:800;color:#2563EB;line-height:1">${new Date(k.datum).getDate()}</div>
+      </div>
+      <div style="flex:1">
+        <div style="font-weight:700;font-size:14px;color:#1C1917">${k.gast_name}</div>
+        <div style="font-size:12px;color:#78716C">${k.uhrzeit} Uhr · ${k.pax} Pax · ${k.sprache==="E"?"🇬🇧":"🇩🇪"}</div>
+      </div>
+      <span style="color:#78716C;font-size:18px">›</span>
+    </div>`).join("")}
+  </div>`;
+}
+
+// ── STORNOS ────────────────────────────────────────────────────────────────
+function renderStornos() {
+  return `
+  <div style="margin-bottom:24px">
+    <h2 style="font-family:'Lora',serif;font-size:24px;color:#1C1917;margin-bottom:4px">Stornos</h2>
+    <p style="color:#78716C;font-size:14px">${STATE.stornos.length} stornierte Führung${STATE.stornos.length!==1?"en":""}</p>
+  </div>
+  ${STATE.stornos.length===0?`<div style="background:#fff;border:1px solid #E8E4DC;border-radius:16px;padding:48px 20px;text-align:center"><div style="font-size:40px;margin-bottom:12px">👍</div><div style="font-weight:700;color:#1C1917">Keine Stornos</div></div>`:""}
+  ${STATE.stornos.map(s=>`
+  <div style="background:#fff;border:1px solid #E8E4DC;border-left:4px solid #DC2626;border-radius:12px;padding:16px 18px;margin-bottom:10px">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
+      <div style="font-weight:700;font-size:15px;color:#1C1917">${s.gast_name}</div>
+      <span class="chip" style="color:#DC2626;background:#FEE2E2;border-color:#FCA5A5">Storno</span>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:12px;font-size:13px;color:#78716C">
+      <span>📅 ${fmtD(s.datum)}</span><span>🕐 ${s.uhrzeit} Uhr</span><span>👥 ${s.pax} Pax</span>
+      <span>❌ ${s.storniert_am?new Date(s.storniert_am).toLocaleDateString("de-DE"):"–"}</span>
+    </div>
+  </div>`).join("")}`;
+}
+
+// ── ADMIN ──────────────────────────────────────────────────────────────────
+function renderAdmin() {
+  return `
+  <div style="margin-bottom:24px">
+    <h2 style="font-family:'Lora',serif;font-size:24px;color:#1C1917;margin-bottom:4px">Admin-Bereich</h2>
+    <p style="color:#78716C;font-size:14px">Passwörter · Guides · Stornos</p>
+  </div>
+  <div id="adminMsg" style="display:${STATE.adminMsg?"block":"none"};background:#D1FAE5;border:1px solid #6EE7B7;border-radius:10px;padding:12px 16px;margin-bottom:16px;font-weight:600;color:#059669">${STATE.adminMsg}</div>
+  <div class="section">
+    <div style="font-weight:700;font-size:16px;color:#1C1917;margin-bottom:14px">📧 Admin E-Mail Adressen</div>
+    <div class="field"><label class="lbl">ADMIN E-MAIL 1</label><div style="display:flex;gap:8px"><input id="adminEmail1" placeholder="admin@email.de" class="inp" style="flex:1"/><button id="saveAdminEmail" style="padding:10px 14px;background:#D97706;color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer;font-family:inherit">Speichern</button></div></div>
+    <div class="field"><label class="lbl">ADMIN E-MAIL 2 (optional)</label><div style="display:flex;gap:8px"><input id="adminEmail2" placeholder="admin2@email.de" class="inp" style="flex:1"/><button id="saveAdminEmail2" style="padding:10px 14px;background:#D97706;color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer;font-family:inherit">Speichern</button></div></div>
+  </div>
+  <div class="section">
+    <div style="font-weight:700;font-size:16px;color:#1C1917;margin-bottom:14px">🔐 Passwörter</div>
+    <div class="field"><label class="lbl">NEUES ADMIN-PASSWORT</label><div style="display:flex;gap:8px"><input id="aPw" type="password" placeholder="Neues Admin-Passwort" class="inp" style="flex:1"/><button id="saveAPw" style="padding:10px 14px;background:#D97706;color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer;font-family:inherit">Speichern</button></div></div>
+    <div class="field"><label class="lbl">NEUES GUIDE-PASSWORT</label><div style="display:flex;gap:8px"><input id="gPw" type="password" placeholder="Neues Guide-Passwort" class="inp" style="flex:1"/><button id="saveGPw" style="padding:10px 14px;background:#D97706;color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer;font-family:inherit">Speichern</button></div></div>
+  </div>
+  <div class="section">
+    <div style="font-weight:700;font-size:16px;color:#1C1917;margin-bottom:14px">🗑️ Storno-Verwaltung (${STATE.stornos.length} Stornos)</div>
+    <div class="field"><label class="lbl">AUTO-LÖSCHEN NACH MONATEN</label><div style="display:flex;gap:8px"><input id="sMon" type="number" min="1" max="36" value="3" class="inp" style="flex:1"/><button id="saveMon" style="padding:10px 14px;background:#2563EB;color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer;font-family:inherit">Speichern</button></div></div>
+    <div style="display:flex;gap:10px">
+      <button id="delAlte" style="flex:1;padding:11px;background:#FEF3C7;color:#D97706;border:1px solid #FDE68A;border-radius:8px;font-weight:700;cursor:pointer;font-family:inherit">🗓️ Alte löschen</button>
+      <button id="delAlle" style="flex:1;padding:11px;background:#FEE2E2;color:#DC2626;border:1px solid #FCA5A5;border-radius:8px;font-weight:700;cursor:pointer;font-family:inherit">🗑️ Alle löschen</button>
+    </div>
+  </div>
+  <div class="section">
+    <div style="font-weight:700;font-size:16px;color:#1C1917;margin-bottom:14px">👤 Tourguides (${STATE.guides.length})</div>
+    ${STATE.guides.map(g=>`
+    <div style="background:#F7F5F0;border-radius:10px;padding:12px 14px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between">
+      <div><div style="font-weight:700;color:#1C1917">${g.name}</div><div style="font-size:12px;color:#78716C">${g.telefon} · ${g.email}</div></div>
+      <div style="display:flex;gap:6px">
+        <button class="editGuide" data-id="${g.id}" style="padding:6px 12px;background:#DBEAFE;color:#2563EB;border:1px solid #93C5FD;border-radius:6px;font-weight:700;cursor:pointer;font-size:12px;font-family:inherit">✏️</button>
+        <button class="delGuide" data-id="${g.id}" style="padding:6px 12px;background:#FEE2E2;color:#DC2626;border:1px solid #FCA5A5;border-radius:6px;font-weight:700;cursor:pointer;font-size:12px;font-family:inherit">🗑️</button>
+      </div>
+    </div>`).join("")}
+    <div style="background:#D1FAE5;border:1.5px dashed #6EE7B7;border-radius:10px;padding:14px">
+      <div style="font-size:12px;font-weight:700;color:#059669;margin-bottom:10px;text-transform:uppercase">+ Neuer Guide</div>
+      <div class="field"><label class="lbl">NAME</label><input id="nGname" placeholder="Vor- und Nachname" class="inp"/></div>
+      <div class="field"><label class="lbl">TELEFON</label><input id="nGtel" placeholder="z.B. 0171 123456" class="inp"/></div>
+      <div class="field"><label class="lbl">E-MAIL</label><input id="nGemail" placeholder="guide@email.de" class="inp"/></div>
+      <button id="addGuide" style="width:100%;padding:11px;background:#059669;color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer;font-family:inherit">✓ Guide hinzufügen</button>
+    </div>
+  </div>`;
+}
+
+// ── MODAL ──────────────────────────────────────────────────────────────────
+function renderModal() {
+  const m = STATE.modal;
+  if (!m) return "";
+  let inner = "";
+  let accent = "#D97706";
+
+  if (m.type === "anfrage") {
+    const a = m.data;
+    accent = "#D97706";
+    inner = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <h3 style="font-family:'Lora',serif;font-size:19px;color:#1C1917;margin:0">${a.gast_name}</h3>
+      <span class="chip" style="color:#D97706;background:#FEF3C7;border-color:#FDE68A">Anfrage</span>
+    </div>
+    ${irow("📅","Datum",fmtD(a.datum))}${irow("🕐","Uhrzeit",a.uhrzeit+" Uhr")}${irow("👥","Pax",a.pax)}${irow("🌐","Sprache",a.sprache==="E"?"🇬🇧 Englisch":"🇩🇪 Deutsch")}${irow("👤","Guides",(a.guide_ids||[]).length+" / "+a.anzahl_guides+" bestätigt")}
+    <div style="height:16px"></div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap">
+      <button id="mGuide" class="btn-green" style="flex:1">✓ Ich übernehme</button>
+      ${STATE.rolle==="admin"?`<button id="mBearbeiten" class="btn-blue" style="flex:1">✏️ Bearbeiten</button><button id="mStornoA" class="btn-outline" style="flex:1">✕ Storno</button>`:""}
+    </div>`;
+  } else if (m.type === "anfrage_edit") {
+    const a = m.data;
+    accent = "#2563EB";
+    inner = `
+    <h3 style="font-family:'Lora',serif;font-size:19px;color:#1C1917;margin:0 0 16px">Bearbeiten: ${a.gast_name}</h3>
+    <div class="field"><label class="lbl">DATUM</label><input id="eDat" type="date" value="${m.edit.datum}" class="inp"/></div>
+    <div class="field"><label class="lbl">UHRZEIT</label><input id="eUhr" type="time" value="${m.edit.uhrzeit}" class="inp"/></div>
+    <div class="field"><label class="lbl">PAX</label><input id="ePax" type="number" value="${m.edit.pax}" class="inp"/></div>
+    <div class="field"><label class="lbl">SPRACHE</label><select id="eSpr" class="inp" style="appearance:none"><option value="D" ${m.edit.sprache==="D"?"selected":""}>🇩🇪 Deutsch</option><option value="E" ${m.edit.sprache==="E"?"selected":""}>🇬🇧 Englisch</option></select></div>
+    <div class="field"><label class="lbl">ANZAHL GUIDES</label><select id="eAG" class="inp" style="appearance:none">${[1,2,3,4,5].map(n=>`<option value="${n}" ${m.edit.anzahl_guides==n?"selected":""}>${n}</option>`).join("")}</select></div>
+    <div style="display:flex;gap:10px"><button id="mSaveEdit" class="btn-blue" style="flex:1">💾 Speichern</button><button id="mCloseEdit" class="btn-outline" style="flex:1">Abbrechen</button></div>`;
+  } else if (m.type === "bestaetigung") {
+    const b = m.data;
+    accent = "#059669";
+    inner = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <h3 style="font-family:'Lora',serif;font-size:19px;color:#1C1917;margin:0">${b.gast_name}</h3>
+      <span class="chip" style="color:#059669;background:#D1FAE5;border-color:#6EE7B7">Guides bereit</span>
+    </div>
+    ${irow("👥","Pax",b.pax)}${irow("🌐","Sprache",b.sprache==="E"?"🇬🇧 Englisch":"🇩🇪 Deutsch")}
+    <div style="height:14px"></div>
+    <div class="field"><label class="lbl">DATUM ANPASSEN</label><input id="bDat" type="date" value="${m.edit.datum}" class="inp"/></div>
+    <div class="field"><label class="lbl">UHRZEIT ANPASSEN</label><input id="bUhr" type="time" value="${m.edit.uhrzeit}" class="inp"/></div>
+    <div class="field"><label class="lbl">PAX ANPASSEN</label><input id="bPax" type="number" value="${m.edit.pax}" class="inp"/></div>
+    <div style="display:flex;gap:10px;margin-top:8px">
+      <button id="mBestaetigen" class="btn-green" style="flex:1">✓ Gast bestätigt → Kalender</button>
+      <button id="mStornoB" class="btn-outline" style="flex:1">✕ Storno</button>
+    </div>`;
+  } else if (m.type === "kalender") {
+    const k = m.data;
+    accent = "#2563EB";
+    inner = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <h3 style="font-family:'Lora',serif;font-size:19px;color:#1C1917;margin:0">${k.gast_name}</h3>
+      <span class="chip" style="color:#2563EB;background:#DBEAFE;border-color:#93C5FD">Bestätigt</span>
+    </div>
+    <div class="field"><label class="lbl">DATUM</label><input id="kDat" type="date" value="${m.edit.datum}" class="inp"/></div>
+    <div class="field"><label class="lbl">UHRZEIT</label><input id="kUhr" type="time" value="${m.edit.uhrzeit}" class="inp"/></div>
+    <div class="field"><label class="lbl">PAX</label><input id="kPax" type="number" value="${m.edit.pax}" class="inp"/></div>
+    <div style="display:flex;gap:10px;margin-top:8px">
+      <button id="mKalSave" class="btn-blue" style="flex:1">💾 Speichern</button>
+      <button id="mStornoK" class="btn-outline" style="flex:1">✕ Storno</button>
+    </div>`;
+  } else if (m.type === "guide_edit") {
+    const g = m.data;
+    accent = "#2563EB";
+    inner = `
+    <h3 style="font-family:'Lora',serif;font-size:19px;color:#1C1917;margin:0 0 16px">Guide bearbeiten</h3>
+    <div class="field"><label class="lbl">NAME</label><input id="geN" value="${g.name}" class="inp"/></div>
+    <div class="field"><label class="lbl">TELEFON</label><input id="geT" value="${g.telefon||""}" class="inp"/></div>
+    <div class="field"><label class="lbl">E-MAIL</label><input id="geE" value="${g.email||""}" class="inp"/></div>
+    <div style="display:flex;gap:10px"><button id="mGeSave" class="btn-green" style="flex:1">💾 Speichern</button><button id="mGeClose" class="btn-outline" style="flex:1">Abbrechen</button></div>`;
+  }
+
+  return `
+  <div class="overlay-bg" id="modalBg">
+    <div class="overlay-box" style="border-top:4px solid ${accent}">${inner}</div>
+  </div>`;
+}
+
+function irow(icon, label, value) {
+  return `<div class="irow"><span style="font-size:15px;width:22px;text-align:center">${icon}</span><span style="font-size:12px;color:#78716C;width:90px;flex-shrink:0">${label}</span><span style="font-size:14px;color:#1C1917;font-weight:600">${value}</span></div>`;
+}
+
+// ── NEUE ANFRAGE FORM ───────────────────────────────────────────────────────
+function renderNeueAnfrageForm() {
+  return `
+  <div class="overlay-bg" id="naFormBg">
+    <div class="overlay-box" style="border-top:4px solid #D97706">
+      <h3 style="font-family:'Lora',serif;font-size:20px;color:#1C1917;margin:0 0 20px">+ Neue Anfrage</h3>
+      <div class="field"><label class="lbl">NAME DES GASTES / FIRMA</label><input id="naName" placeholder="z.B. Familie Müller" class="inp"/></div>
+      <div class="grid2">
+        <div class="field"><label class="lbl">DATUM</label><input id="naDat" type="date" class="inp"/></div>
+        <div class="field"><label class="lbl">UHRZEIT</label><input id="naUhr" type="time" class="inp"/></div>
+        <div class="field"><label class="lbl">PAX</label><input id="naPax" type="number" min="1" placeholder="z.B. 10" class="inp"/></div>
+        <div class="field"><label class="lbl">SPRACHE</label><select id="naSpr" class="inp" style="appearance:none"><option value="D">🇩🇪 Deutsch</option><option value="E">🇬🇧 Englisch</option></select></div>
+      </div>
+      <div class="field"><label class="lbl">ANZAHL BENÖTIGTE GUIDES</label><select id="naAG" class="inp" style="appearance:none"><option value="1">1 Guide</option><option value="2">2 Guides</option><option value="3">3 Guides</option><option value="4">4 Guides</option><option value="5">5 Guides</option></select></div>
+      <div style="display:flex;gap:10px;margin-top:8px">
+        <button id="naSave" class="btn-amber">✓ Speichern</button>
+        <button id="naClose" class="btn-outline">Abbrechen</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+// ── BIND PAGE CONTENT ──────────────────────────────────────────────────────
+function bindPageContent() {
+  // Dashboard stats
+  document.querySelectorAll(".dash-stat").forEach(el => {
+    el.addEventListener("click", () => setState({seite: parseInt(el.dataset.seite)}));
+  });
+  // Anfragen cards
+  document.querySelectorAll(".anfrage-card").forEach(el => {
+    el.addEventListener("click", () => {
+      const a = STATE.anfragen.find(x => x.id === el.dataset.id);
+      if (a) setState({modal:{type:"anfrage",data:a}});
+    });
+  });
+  // Bestätigung cards
+  document.querySelectorAll(".best-card").forEach(el => {
+    el.addEventListener("click", () => {
+      const b = STATE.bestaetigt.find(x => x.id === el.dataset.id);
+      if (b) setState({modal:{type:"bestaetigung",data:b,edit:{datum:b.datum,uhrzeit:b.uhrzeit,pax:b.pax}}});
+    });
+  });
+  // Kalender events
+  document.querySelectorAll(".kal-ev").forEach(el => {
+    el.addEventListener("click", () => {
+      const k = STATE.kalender.find(x => x.id === el.dataset.id);
+      if (k) setState({modal:{type:"kalender",data:k,edit:{datum:k.datum,uhrzeit:k.uhrzeit,pax:k.pax}}});
+    });
+  });
+  // Kalender nav
+  const kp = document.getElementById("kalPrev");
+  const kn = document.getElementById("kalNext");
+  if (kp) kp.addEventListener("click", () => {
+    const m = STATE.kalMonat;
+    setState({kalMonat: new Date(m.getFullYear(), m.getMonth()-1, 1)});
+  });
+  if (kn) kn.addEventListener("click", () => {
+    const m = STATE.kalMonat;
+    setState({kalMonat: new Date(m.getFullYear(), m.getMonth()+1, 1)});
+  });
+  // Admin bindings
+  bindAdmin();
+}
+
+function bindAdmin() {
+  // Admin E-Mails laden und speichern
+  supabase("einstellungen","GET",null,"?id=eq.1").then(d => {
+    if (d && d[0]) {
+      const e1 = document.getElementById("adminEmail1");
+      const e2 = document.getElementById("adminEmail2");
+      if (e1) e1.value = d[0].admin_email || "";
+      if (e2) e2.value = d[0].admin_email2 || "";
+    }
+  });
+  const sAE1 = document.getElementById("saveAdminEmail");
+  if (sAE1) sAE1.addEventListener("click", async () => {
+    const v = document.getElementById("adminEmail1").value;
+    await supabase("einstellungen","PATCH",{admin_email:v},"?id=eq.1");
+    zeig("✓ Admin E-Mail 1 gespeichert!");
+  });
+  const sAE2 = document.getElementById("saveAdminEmail2");
+  if (sAE2) sAE2.addEventListener("click", async () => {
+    const v = document.getElementById("adminEmail2").value;
+    await supabase("einstellungen","PATCH",{admin_email2:v},"?id=eq.1");
+    zeig("✓ Admin E-Mail 2 gespeichert!");
+  });
+
+  const sAPw = document.getElementById("saveAPw");
+  const sGPw = document.getElementById("saveGPw");
+  const sMon = document.getElementById("saveMon");
+  const dAlte = document.getElementById("delAlte");
+  const dAlle = document.getElementById("delAlle");
+  const addG = document.getElementById("addGuide");
+
+  if (sAPw) sAPw.addEventListener("click", async () => {
+    const v = document.getElementById("aPw").value;
+    if (!v) return;
+    await supabase("einstellungen","PATCH",{admin_passwort:v},"?id=eq.1");
+    showAdminMsg("✓ Admin-Passwort gespeichert!");
+  });
+  if (sGPw) sGPw.addEventListener("click", async () => {
+    const v = document.getElementById("gPw").value;
+    if (!v) return;
+    await supabase("einstellungen","PATCH",{guide_passwort:v},"?id=eq.1");
+    showAdminMsg("✓ Guide-Passwort gespeichert!");
+  });
+  if (sMon) sMon.addEventListener("click", async () => {
+    const v = parseInt(document.getElementById("sMon").value);
+    await supabase("einstellungen","PATCH",{storno_monate:v},"?id=eq.1");
+    showAdminMsg("✓ Einstellung gespeichert!");
+  });
+  if (dAlte) dAlte.addEventListener("click", async () => {
+    const mon = parseInt(document.getElementById("sMon").value)||3;
+    if (!confirm("Stornos älter als "+mon+" Monate löschen?")) return;
+    const g = new Date(); g.setMonth(g.getMonth()-mon);
+    await supabase("stornos","DELETE",null,"?storniert_am=lt."+g.toISOString());
+    await loadAll(); showAdminMsg("✓ Alte Stornos gelöscht!");
+  });
+  if (dAlle) dAlle.addEventListener("click", async () => {
+    if (!confirm("Wirklich ALLE Stornos löschen?")) return;
+    for (const s of STATE.stornos) await supabase("stornos","DELETE",null,"?id=eq."+s.id);
+    await loadAll(); showAdminMsg("✓ Alle Stornos gelöscht!");
+  });
+  if (addG) addG.addEventListener("click", async () => {
+    const name = document.getElementById("nGname").value;
+    if (!name) return;
+    await supabase("guides","POST",{name,telefon:document.getElementById("nGtel").value,email:document.getElementById("nGemail").value});
+    await loadAll(); showAdminMsg("✓ Guide hinzugefügt!");
+  });
+  document.querySelectorAll(".editGuide").forEach(el => {
+    el.addEventListener("click", () => {
+      const g = STATE.guides.find(x => x.id === el.dataset.id);
+      if (g) setState({modal:{type:"guide_edit",data:g}});
+    });
+  });
+  document.querySelectorAll(".delGuide").forEach(el => {
+    el.addEventListener("click", async () => {
+      if (!confirm("Guide wirklich löschen?")) return;
+      await supabase("guides","DELETE",null,"?id=eq."+el.dataset.id);
+      await loadAll();
+    });
+  });
+}
+
+function showAdminMsg(txt) {
+  setState({adminMsg:txt});
+  setTimeout(()=>setState({adminMsg:""}),3000);
+}
+
+// ── BIND MODAL ─────────────────────────────────────────────────────────────
+function bindModal() {
+  const bg = document.getElementById("modalBg");
+  if (bg) bg.addEventListener("click", e => { if (e.target===bg) setState({modal:null}); });
+
+  const m = STATE.modal;
+  if (!m) return;
+
+  // Anfrage modal
+  const mGuide = document.getElementById("mGuide");
+  if (mGuide) mGuide.addEventListener("click", async () => {
+    const a = m.data;
+    const ids = [...(a.guide_ids||[]),"guide_"+Date.now()];
+    const genug = ids.length >= a.anzahl_guides;
+    await supabase("anfragen","PATCH",{guide_ids:ids,status:genug?"bestaetigt":"offen"},"?id=eq."+a.id);
+    await emailAnAdmin(EJS_TEMPLATE_NEU, a);
+    await loadAll(); setState({modal:null});
+  });
+  const mBear = document.getElementById("mBearbeiten");
+  if (mBear) mBear.addEventListener("click", () => {
+    const a = m.data;
+    setState({modal:{type:"anfrage_edit",data:a,edit:{datum:a.datum,uhrzeit:a.uhrzeit,pax:a.pax,sprache:a.sprache,anzahl_guides:a.anzahl_guides}}});
+  });
+  const mSA = document.getElementById("mStornoA");
+  if (mSA) mSA.addEventListener("click", async () => {
+    if (!confirm("Wirklich stornieren?")) return;
+    const a = m.data;
+    const stornoData = {
+      gast_name: a.gast_name, datum: a.datum, uhrzeit: a.uhrzeit,
+      pax: a.pax, sprache: a.sprache||'D', anzahl_guides: a.anzahl_guides||1,
+      guide_ids: a.guide_ids||[], status: 'storno',
+      erstellt_am: a.erstellt_am||new Date().toISOString(),
+      storniert_am: new Date().toISOString()
+    };
+    await supabase("stornos","POST",stornoData);
+    await supabase("anfragen","DELETE",null,"?id=eq."+a.id);
+    await emailStorno(stornoData);
+    await loadAll(); setState({modal:null});
+  });
+
+  // Edit modal
+  const mSE = document.getElementById("mSaveEdit");
+  if (mSE) mSE.addEventListener("click", async () => {
+    const edit = {
+      datum: document.getElementById("eDat").value,
+      uhrzeit: document.getElementById("eUhr").value,
+      pax: parseInt(document.getElementById("ePax").value),
+      sprache: document.getElementById("eSpr").value,
+      anzahl_guides: parseInt(document.getElementById("eAG").value),
+    };
+    await supabase("anfragen","PATCH",edit,"?id=eq."+m.data.id);
+    await loadAll(); setState({modal:null});
+  });
+  const mCE = document.getElementById("mCloseEdit");
+  if (mCE) mCE.addEventListener("click", () => setState({modal:null}));
+
+  // Bestätigung modal
+  const mBest = document.getElementById("mBestaetigen");
+  if (mBest) mBest.addEventListener("click", async () => {
+    const edit = {
+      datum: document.getElementById("bDat").value,
+      uhrzeit: document.getElementById("bUhr").value,
+      pax: parseInt(document.getElementById("bPax").value),
+    };
+    const kalData = {...m.data,...edit,bestaetigt_am:new Date().toISOString()};
+    await supabase("kalender","POST",kalData);
+    await supabase("anfragen","DELETE",null,"?id=eq."+m.data.id);
+    await emailBestaetigung(kalData);
+    await loadAll(); setState({modal:null});
+  });
+  const mSB = document.getElementById("mStornoB");
+  if (mSB) mSB.addEventListener("click", async () => {
+    if (!confirm("Wirklich stornieren?")) return;
+    const b = m.data;
+    const stornoData = {
+      gast_name: b.gast_name,
+      datum: b.datum,
+      uhrzeit: b.uhrzeit,
+      pax: b.pax,
+      sprache: b.sprache || 'D',
+      anzahl_guides: b.anzahl_guides || 1,
+      guide_ids: b.guide_ids || [],
+      status: 'storno',
+      erstellt_am: b.erstellt_am || new Date().toISOString(),
+      storniert_am: new Date().toISOString()
+    };
+    await supabase("stornos","POST",stornoData);
+    await supabase("anfragen","DELETE",null,"?id=eq."+b.id);
+    await emailStorno(stornoData);
+    await loadAll(); setState({modal:null});
+  });
+
+  // Kalender modal
+  const mKS = document.getElementById("mKalSave");
+  if (mKS) mKS.addEventListener("click", async () => {
+    const edit = {
+      datum: document.getElementById("kDat").value,
+      uhrzeit: document.getElementById("kUhr").value,
+      pax: parseInt(document.getElementById("kPax").value),
+    };
+    await supabase("kalender","PATCH",edit,"?id=eq."+m.data.id);
+    // E-Mail Änderung an Guides
+    await emailAnZugewieseneGuides("Führung geändert", "Die Führung wurde geändert", {...m.data,...edit}, m.data.guide_ids);
+    await loadAll(); setState({modal:null});
+  });
+  const mSK = document.getElementById("mStornoK");
+  if (mSK) mSK.addEventListener("click", async () => {
+    if (!confirm("Wirklich stornieren?")) return;
+    const k = m.data;
+    const stornoData = {
+      gast_name: k.gast_name,
+      datum: k.datum,
+      uhrzeit: k.uhrzeit,
+      pax: k.pax,
+      sprache: k.sprache || 'D',
+      anzahl_guides: k.anzahl_guides || 1,
+      guide_ids: k.guide_ids || [],
+      status: 'storno',
+      erstellt_am: k.erstellt_am || new Date().toISOString(),
+      storniert_am: new Date().toISOString()
+    };
+    await supabase("stornos","POST",stornoData);
+    await supabase("kalender","DELETE",null,"?id=eq."+k.id);
+    // E-Mail Storno an Guides
+    await emailStorno(stornoData);
+    await loadAll(); setState({modal:null});
+  });
+
+  // Guide edit modal
+  const mGS = document.getElementById("mGeSave");
+  if (mGS) mGS.addEventListener("click", async () => {
+    await supabase("guides","PATCH",{
+      name: document.getElementById("geN").value,
+      telefon: document.getElementById("geT").value,
+      email: document.getElementById("geE").value,
+    },"?id=eq."+m.data.id);
+    await loadAll(); setState({modal:null});
+  });
+  const mGC = document.getElementById("mGeClose");
+  if (mGC) mGC.addEventListener("click", () => setState({modal:null}));
+}
+
+// ── BIND NEUE ANFRAGE ──────────────────────────────────────────────────────
+function bindNeueAnfrageForm() {
+  const bg = document.getElementById("naFormBg");
+  if (bg) bg.addEventListener("click", e => { if(e.target===bg) setState({neuAnfrage:false}); });
+  const cl = document.getElementById("naClose");
+  if (cl) cl.addEventListener("click", () => setState({neuAnfrage:false}));
+  const sv = document.getElementById("naSave");
+  if (sv) sv.addEventListener("click", async () => {
+    const name = document.getElementById("naName").value;
+    const dat = document.getElementById("naDat").value;
+    const uhr = document.getElementById("naUhr").value;
+    const pax = document.getElementById("naPax").value;
+    if (!name||!dat||!uhr||!pax) { alert("Bitte alle Felder ausfüllen!"); return; }
+    const neueDaten = {
+      gast_name:name, datum:dat, uhrzeit:uhr, pax:parseInt(pax),
+      sprache:document.getElementById("naSpr").value,
+      anzahl_guides:parseInt(document.getElementById("naAG").value),
+      status:"offen", guide_ids:[], erstellt_am:new Date().toISOString()
+    };
+    await supabase("anfragen","POST", neueDaten);
+    await emailAnAlleGuides(neueDaten);
+    await loadAll();
+    setState({neuAnfrage:false});
+  });
+}
+
+// ── START ──────────────────────────────────────────────────────────────────
+loadAll();
+render();
+</script>
+</body>
+</html>

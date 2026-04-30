@@ -839,9 +839,8 @@ function bindModal() {
       erstellt_am: a.erstellt_am||new Date().toISOString(),
       storniert_am: new Date().toISOString()
     };
-    // Anfrage als storniert markieren - NICHT löschen
-    await supabase("anfragen","PATCH",{status:"storniert"},"?id=eq.${a.id}");
     await supabase("stornos","POST",stornoData);
+    await supabase("anfragen","PATCH",{status:"storniert"},"?id=eq."+a.id);
     // Keine E-Mail bei Storno aus Anfrage
     await loadAll(); setState({modal:null});
   });

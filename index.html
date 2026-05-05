@@ -620,6 +620,12 @@ function renderModal() {
     <div class="field"><label class="lbl">DATUM</label><input id="kDat" type="date" value="${m.edit.datum}" class="inp"/></div>
     <div class="field"><label class="lbl">UHRZEIT</label><input id="kUhr" type="time" value="${m.edit.uhrzeit}" class="inp"/></div>
     <div class="field"><label class="lbl">PAX</label><input id="kPax" type="number" value="${m.edit.pax}" class="inp"/></div>
+    <div class="field"><label class="lbl">GUIDE</label>
+      <select id="kGuide" class="inp" style="appearance:none">
+        <option value="">— Guide wählen —</option>
+        ${STATE.guides.map(g=>`<option value="${g.name}" ${m.data.guide_name===g.name?"selected":""}>${g.name}</option>`).join("")}
+      </select>
+    </div>
     <div style="display:flex;gap:10px;margin-top:8px">
       <button id="mKalSave" class="btn-blue" style="flex:1">💾 Speichern</button>
       <button id="mStornoK" class="btn-outline" style="flex:1">✕ Storno</button>
@@ -996,14 +1002,14 @@ function bindModal() {
   // Kalender modal
   const mKS = document.getElementById("mKalSave");
   if (mKS) mKS.addEventListener("click", async () => {
+    const guideEl = document.getElementById("kGuide");
     const edit = {
       datum: document.getElementById("kDat").value,
       uhrzeit: document.getElementById("kUhr").value,
       pax: parseInt(document.getElementById("kPax").value),
+      guide_name: guideEl ? guideEl.value : m.data.guide_name,
     };
     await supabase("kalender","PATCH",edit,"?id=eq."+m.data.id);
-    // E-Mail Änderung an Guides
-    await emailAnZugewieseneGuides("Führung geändert", "Die Führung wurde geändert", {...m.data,...edit}, m.data.guide_ids);
     await loadAll(); setState({modal:null});
   });
   const mSK = document.getElementById("mStornoK");
@@ -1023,9 +1029,7 @@ function bindModal() {
       storniert_am: new Date().toISOString()
     };
     await supabase("stornos","POST",stornoData);
-    // Kalender-Eintrag als storniert markieren - NICHT löschen
-    await supabase("kalender","PATCH",{status:"storniert",storniert_am:new Date().toISOString()},"?id=eq."+k.id);
-    // E-Mail nur an zugewiesenen Guide
+    await supabase("kalender","DELETE",null,"?id=eq."+k.id);
     await emailStornoGuide(stornoData);
     await loadAll(); setState({modal:null});
   });

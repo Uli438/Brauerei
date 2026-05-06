@@ -89,23 +89,37 @@ async function ladeAdminEmails() {
 
 function erstelleKalenderLink(daten) {
   try {
-    // Parse datum and uhrzeit
     const datum = daten.datum || "";
     const uhrzeit = daten.uhrzeit || "00:00";
     const [jahr, monat, tag] = datum.split("-");
     const [std, min] = uhrzeit.split(":");
-    
-    // Format for Google Calendar: YYYYMMDDTHHmmss
     const start = `${jahr}${monat}${tag}T${std}${min}00`;
-    // Add 2 hours for end time
     const endStd = String(parseInt(std) + 2).padStart(2, "0");
     const end = `${jahr}${monat}${tag}T${endStd}${min}00`;
-    
     const title = encodeURIComponent(`Brauereiführung: ${daten.gast_name}`);
     const details = encodeURIComponent(`Gast: ${daten.gast_name}\nPersonen: ${daten.pax}\nSprache: ${daten.sprache==="E"?"Englisch":"Deutsch"}`);
     const location = encodeURIComponent("Brauerei");
-    
     return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${start}/${end}&details=${details}&location=${location}`;
+  } catch(e) {
+    return "";
+  }
+}
+
+function erstelleAppleLink(daten) {
+  try {
+    const datum = daten.datum || "";
+    const uhrzeit = daten.uhrzeit || "00:00";
+    const [jahr, monat, tag] = datum.split("-");
+    const [std, min] = uhrzeit.split(":");
+    const start = `${jahr}${monat}${tag}T${std}${min}00`;
+    const endStd = String(parseInt(std) + 2).padStart(2, "0");
+    const end = `${jahr}${monat}${tag}T${endStd}${min}00`;
+    const title = encodeURIComponent(`Brauereiführung: ${daten.gast_name}`);
+    const details = encodeURIComponent(`Gast: ${daten.gast_name}, Personen: ${daten.pax}, Sprache: ${daten.sprache==="E"?"Englisch":"Deutsch"}`);
+    const location = encodeURIComponent("Brauerei");
+    // ICS Datei als Data URL für Apple Kalender
+    const ics = `BEGIN:VCALENDAR\nVERSION:2.0\nBEGIN:VEVENT\nDTSTART:${start}\nDTEND:${end}\nSUMMARY:${decodeURIComponent(title)}\nDESCRIPTION:${decodeURIComponent(details)}\nLOCATION:Brauerei\nEND:VEVENT\nEND:VCALENDAR`;
+    return `data:text/calendar;charset=utf8,${encodeURIComponent(ics)}`;
   } catch(e) {
     return "";
   }
@@ -123,6 +137,7 @@ async function sendeEmail(guide_name, guide_email, template, daten) {
       sprache: daten.sprache === "E" ? "Englisch" : "Deutsch",
       anzahl_guides: daten.anzahl_guides || 1,
       kalender_link: erstelleKalenderLink(daten),
+      apple_link: erstelleAppleLink(daten),
     });
     console.log("E-Mail gesendet an " + guide_email);
   } catch(e) {

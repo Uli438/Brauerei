@@ -616,6 +616,12 @@ function renderModal() {
     </div>
     ${irow("👥","Pax",b.pax)}${irow("🌐","Sprache",b.sprache==="E"?"🇬🇧 Englisch":"🇩🇪 Deutsch")}${irow("👤","Guide(s)",(b.guide_names&&b.guide_names.length>0)?b.guide_names.join(", "):"–")}
     <div style="height:14px"></div>
+    <div class="field"><label class="lbl">GUIDE(S) ÄNDERN</label>
+      <select id="bGuide" class="inp" style="appearance:none">
+        <option value="">— Guide wählen —</option>
+        ${STATE.guides.map(g=>`<option value="${g.name}" ${(m.data.guide_names&&m.data.guide_names[0])===g.name?"selected":""}>${g.name}</option>`).join("")}
+      </select>
+    </div>
     <div class="field"><label class="lbl">DATUM ANPASSEN</label><input id="bDat" type="date" value="${m.edit.datum}" class="inp"/></div>
     <div class="field"><label class="lbl">UHRZEIT ANPASSEN</label><input id="bUhr" type="time" value="${m.edit.uhrzeit}" class="inp"/></div>
     <div class="field"><label class="lbl">PAX ANPASSEN</label><input id="bPax" type="number" value="${m.edit.pax}" class="inp"/></div>
@@ -971,7 +977,8 @@ function bindModal() {
       uhrzeit: document.getElementById("bUhr").value,
       pax: parseInt(document.getElementById("bPax").value),
     };
-    const guideName = (m.data.guide_names||[]).join(", ");
+    const guideGeaendert = document.getElementById("bGuide");
+    const guideNameNeu = guideGeaendert && guideGeaendert.value ? guideGeaendert.value : (m.data.guide_names||[]).join(", ");
     const kalData = {
       gast_name: m.data.gast_name,
       datum: edit.datum || m.data.datum,
@@ -980,7 +987,7 @@ function bindModal() {
       sprache: m.data.sprache || 'D',
       anzahl_guides: m.data.anzahl_guides || 1,
       guide_ids: m.data.guide_ids || [],
-      guide_name: guideName,
+      guide_name: guideNameNeu,
       status: 'bestaetigt',
       erstellt_am: m.data.erstellt_am || new Date().toISOString(),
       bestaetigt_am: new Date().toISOString()

@@ -1141,6 +1141,22 @@ function bindNeueAnfrageForm() {
     const uhr = document.getElementById("naUhr").value;
     const pax = document.getElementById("naPax").value;
     if (!name||!dat||!uhr||!pax) { alert("Bitte alle Felder ausfüllen!"); return; }
+
+    // Button deaktivieren - verhindert Doppelklick
+    sv.disabled = true;
+    sv.textContent = "⏳ Speichern...";
+
+    // Duplikat-Prüfung
+    const duplikat = [...STATE.anfragen, ...STATE.bestaetigt, ...STATE.kalender].find(x =>
+      x.gast_name === name && x.datum === dat && x.uhrzeit === uhr
+    );
+    if (duplikat) {
+      alert("⚠️ Diese Führung existiert bereits!\n\nGast: " + name + "\nDatum: " + new Date(dat).toLocaleDateString("de-DE") + "\nUhrzeit: " + uhr + " Uhr");
+      sv.disabled = false;
+      sv.textContent = "✓ Speichern";
+      return;
+    }
+
     const neueDaten = {
       gast_name:name, datum:dat, uhrzeit:uhr, pax:parseInt(pax),
       sprache:document.getElementById("naSpr").value,
@@ -1148,7 +1164,6 @@ function bindNeueAnfrageForm() {
       status:"offen", guide_ids:[], erstellt_am:new Date().toISOString()
     };
     await supabase("anfragen","POST", neueDaten);
-    // Keine E-Mail bei neuer Anfrage
     await loadAll();
     setState({neuAnfrage:false});
   });

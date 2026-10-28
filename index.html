@@ -231,7 +231,7 @@ async function emailStorno(daten) {
 }
 
 async function emailStornoGuide(daten) {
-  // Nur an den zugewiesenen Guide
+  // An ALLE zugewiesenen Guides senden
   const guideName = daten.guide_name || "";
   if (!guideName) return;
   const guideNames = guideName.split(", ");
@@ -244,20 +244,14 @@ async function emailStornoGuide(daten) {
 }
 
 async function emailBestaetigung(daten) {
-  // Nur an den zugewiesenen Guide
+  // An ALLE zugewiesenen Guides senden
   const guideName = daten.guide_name || "";
   if (!guideName) return;
-  const guide = STATE.guides.find(g => g.name === guideName || guideName.includes(g.name));
-  if (guide && guide.email) {
-    await sendeEmail(guide.name, guide.email, EJS_TEMPLATE_NEU, daten);
-  } else {
-    // Falls mehrere Guides - alle die im guide_name stehen
-    const guideNames = guideName.split(", ");
-    for (const name of guideNames) {
-      const g = STATE.guides.find(x => x.name === name.trim());
-      if (g && g.email) {
-        await sendeEmail(g.name, g.email, EJS_TEMPLATE_NEU, daten);
-      }
+  const guideNames = guideName.split(", ");
+  for (const name of guideNames) {
+    const g = STATE.guides.find(x => x.name === name.trim());
+    if (g && g.email) {
+      await sendeEmail(g.name, g.email, EJS_TEMPLATE_NEU, daten);
     }
   }
 }
@@ -710,11 +704,8 @@ function renderModal() {
     <div class="field"><label class="lbl">DATUM</label><input id="kDat" type="date" value="${m.edit.datum}" class="inp"/></div>
     <div class="field"><label class="lbl">UHRZEIT</label><input id="kUhr" type="time" value="${m.edit.uhrzeit}" class="inp"/></div>
     <div class="field"><label class="lbl">PAX</label><input id="kPax" type="number" value="${m.edit.pax}" class="inp"/></div>
-    <div class="field"><label class="lbl">GUIDE</label>
-      <select id="kGuide" class="inp" style="appearance:none">
-        <option value="">— Guide wählen —</option>
-        ${STATE.guides.map(g=>`<option value="${g.name}" ${m.data.guide_name===g.name?"selected":""}>${g.name}</option>`).join("")}
-      </select>
+    <div class="field"><label class="lbl">GUIDE(S) – bei mehreren mit Komma trennen</label>
+      <input id="kGuide" class="inp" value="${m.data.guide_name||''}" placeholder="z.B. Hans Bauer, Maria Hopf"/>
     </div>
     <div style="display:flex;gap:10px;margin-top:8px">
       <button id="mKalSave" class="btn-blue" style="flex:1">💾 Speichern</button>
@@ -1054,7 +1045,15 @@ function bindModal() {
       pax: parseInt(document.getElementById("bPax").value),
     };
     const guideGeaendert = document.getElementById("bGuide");
-    const guideNameNeu = guideGeaendert && guideGeaendert.value ? guideGeaendert.value : (m.data.guide_names||[]).join(", ");
+    // Alle zugesagten Guides behalten - dropdown nur als Ergänzung
+    let alleGuides = [...(m.data.guide_names||[])];
+    if (guideGeaendert && guideGeaendert.value && !alleGuides.includes(guideGeaendert.value)) {
+      alleGuides.push(guideGeaendert.value);
+    }
+    if (alleGuides.length === 0 && guideGeaendert && guideGeaendert.value) {
+      alleGuides = [guideGeaendert.value];
+    }
+    const guideNameNeu = alleGuides.join(", ");
     const kalData = {
       gast_name: m.data.gast_name,
       datum: edit.datum || m.data.datum,
@@ -1064,6 +1063,7 @@ function bindModal() {
       anzahl_guides: m.data.anzahl_guides || 1,
       guide_ids: m.data.guide_ids || [],
       guide_name: guideNameNeu,
+      guide_names: alleGuides,
       status: 'bestaetigt',
       erstellt_am: m.data.erstellt_am || new Date().toISOString(),
       bestaetigt_am: new Date().toISOString()
